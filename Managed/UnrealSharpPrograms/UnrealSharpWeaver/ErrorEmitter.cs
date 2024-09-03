@@ -89,7 +89,7 @@ static class ErrorEmitter
 
     public static Dictionary<TKey,TValue> ToDictionaryErrorEmit<TType,TKey, TValue> (this IEnumerable<TType> values, Func<TType,TKey> keyfunc, Func<TType,TValue> valuefunc, out bool hadError)
     {
-        Dictionary<TKey, TValue> result = new Dictionary<TKey, TValue>();
+        Dictionary<TKey, TValue> result = new();
         hadError = false;
 
         foreach (var item in values)

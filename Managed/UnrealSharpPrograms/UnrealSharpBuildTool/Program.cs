@@ -1,20 +1,55 @@
-﻿using System.Reflection.PortableExecutable;
-using CommandLine;
+﻿using CommandLine;
+using CommandLine.Text;
+
 using UnrealSharpBuildTool.Actions;
+using UnrealSharpBuildTool.Models;
 
 namespace UnrealSharpBuildTool;
 
 public static class Program
 {
-    public static BuildToolOptions buildToolOptions;
-
-    public static int Main(string[] args)
+    internal static void SetSettings(ParserSettings settings)
     {
+        settings.CaseInsensitiveEnumValues = true;
+        settings.HelpWriter = null;
+    }
+    public static BuildToolOptions buildToolOptions;
+    
+    public static int Main(params string[] args)
+    {
+        using var parser = new Parser(SetSettings);
+       
+        var result = parser.ParseArguments<BuildToolOptions>(args);
+        var results = parser.ParseArguments<ToolOptions>(args);
+        results.WithParsed(result =>
+        {
+            Commands.Command value = result.Action switch
+            {
+                BuildAction.Build => new Commands.BuildSolution(result),
+                BuildAction.Clean => new Commands.CleanSolution(result),
+                BuildAction.Rebuild => new Commands.RebuildSolution(result),
+                BuildAction.GenerateProject => new Commands.GenerateProject(result),
+                BuildAction.Weave => new Commands.WeaveProject(result),
+                BuildAction.Publish => new Commands.PublishProject(result),
+                _ => throw new Exception($"Can't find build action with name \"{result.Action}\"")
+            };
+            value.Execute();
+        });
+        results.WithNotParsed(errors =>
+        {
+            var helpText = HelpText.AutoBuild(results, h =>
+            {
+                h.AutoHelp = false;     // hides --help
+                h.AutoVersion = false;  // hides --version
+                return HelpText.DefaultParsingErrorsHandler(results, h);
+            }, e => e);
+            Console.WriteLine(helpText);
+        });
         try
         {
-            Parser parser = new Parser(with => with.HelpWriter = null);
-            ParserResult<BuildToolOptions> result = parser.ParseArguments<BuildToolOptions>(args);
-        
+            //Parser parser = new(with => with.HelpWriter = null);
+            //var result = parser.ParseArguments<BuildToolOptions>(args);
+            
             if (result.Tag == ParserResultType.NotParsed)
             {
                 BuildToolOptions.PrintHelp(result);
@@ -28,11 +63,11 @@ public static class Program
                 throw new Exception("Failed to initialize action.");
             }
             
-            Console.WriteLine($"UnrealSharpBuildTool executed {buildToolOptions.Action.ToString()} action successfully.");
+            Console.WriteLine($"UnrealSharpBuildTool executed {buildToolOptions.Action} action successfully.");
         }
         catch (Exception exception)
         {
-            Console.WriteLine(exception.Message);
+            Console.Error.WriteLine(exception.Message);
             return 1;
         }
         
@@ -75,23 +110,11 @@ public static class Program
     {
         return buildToolOptions.ProjectDirectory;
     }
-    
-    public static string FixPath(string path)
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            return path.Replace('/', '\\');
-        }
-        
-        return path;
-    }
 
-    public static string GetProjectNameAsManaged()
-    {
-        return "Managed" + buildToolOptions.ProjectName;
-    }
+
+    public static string ManagedProjectName => $"Managed{buildToolOptions.ProjectName}";
     
-    public static string GetOutputPath()
+    public static string OutputPath()
     {
         string rootOutput = buildToolOptions.ArchiveDirectory ?? buildToolOptions.ProjectDirectory;
         
@@ -112,7 +135,7 @@ public static class Program
     {
         return Path.Combine(buildToolOptions.PluginDirectory, "Binaries", "Managed");
     }
-    
+
     public static string GetVersion()
     {
         Version currentVersion = Environment.Version;

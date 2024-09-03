@@ -226,7 +226,7 @@ public static class FunctionProcessor
 
         if (func.HasReturnValue)
         {
-            NativeDataType nativeReturnType = func.ReturnValue.PropertyDataType;
+            NativeDataType nativeReturnType = func.ReturnValue!.PropertyDataType;
             processor.Emit(OpCodes.Stloc, returnIndex);
 
             Instruction loadReturnProperty = processor.Create(OpCodes.Ldloc, returnIndex);
@@ -264,12 +264,12 @@ public static class FunctionProcessor
         bool hasParams = methodDef.Parameters.Count > 0 || hasReturnValue;
 
         ILProcessor processor = methodDef.Body.GetILProcessor();
-        VariableDefinition? argumentsBufferPtr = null;
+        VariableDefinition argumentsBufferPtr = default!;
         List<Instruction> allCleanupInstructions = [];
         
         Instruction loadObjectInstance = Instruction.Create(OpCodes.Ldarg_0);
-        Instruction? loadArgumentBuffer = null;
-        
+        Instruction loadArgumentBuffer = default!;
+
         if (hasParams)
         {
             WriteParametersToNative(processor, methodDef, metadata, paramsSizeField, paramRewriteInfos, out argumentsBufferPtr, out loadArgumentBuffer, allCleanupInstructions);
@@ -331,7 +331,7 @@ public static class FunctionProcessor
         {
             // Return value is always the last parameter.
             Instruction[] load = NativeDataType.GetArgumentBufferInstructions(processor, loadArgumentBuffer, paramRewriteInfos[^1].OffsetField!);
-            metadata.ReturnValue.PropertyDataType.WriteMarshalFromNative(processor, type, load, Instruction.Create(OpCodes.Ldc_I4_0));
+            metadata.ReturnValue!.PropertyDataType.WriteMarshalFromNative(processor, type, load, Instruction.Create(OpCodes.Ldc_I4_0));
         }
 
         processor.Emit(OpCodes.Ret);
@@ -369,7 +369,7 @@ public static class FunctionProcessor
 
     public static MethodDefinition CreateMethod(TypeDefinition declaringType, string name, MethodAttributes attributes, TypeReference? returnType = null, TypeReference[]? parameters = null)
     {
-        MethodDefinition def = new MethodDefinition(name, attributes, returnType ?? WeaverHelper.VoidTypeRef);
+        MethodDefinition def = new(name, attributes, returnType ?? WeaverHelper.VoidTypeRef);
 
         if (parameters != null)
         {
@@ -448,16 +448,11 @@ public static class FunctionProcessor
         {
             PropertyMetaData paramType = paramRewriteInfos[i].PropertyMetaData;
             
-            if (paramType.IsReturnParameter)
+            if (paramType.IsReturnParameter || paramType is { IsOutParameter: true, IsReferenceParameter: false })
             {
                 continue;
             }
 
-            if (paramType is { IsOutParameter: true, IsReferenceParameter: false })
-            {
-                continue;
-            }
-        
             FieldDefinition offsetField = paramRewriteInfos[i].OffsetField!;
             NativeDataType nativeDataType = paramType.PropertyDataType;
 

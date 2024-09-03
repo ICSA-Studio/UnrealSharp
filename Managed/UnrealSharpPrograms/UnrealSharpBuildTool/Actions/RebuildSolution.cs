@@ -4,14 +4,14 @@ public class RebuildSolution : BuildSolution
 {
     public override bool RunAction()
     {
-        CleanSolution cleanSolutionProcess = new CleanSolution();
+        CleanSolution cleanSolutionProcess = new();
         
         if (!cleanSolutionProcess.RunAction())
         {
             return false;
         }
 
-        BuildSolution buildSolution = new BuildSolution();
+        BuildSolution buildSolution = new();
         
         if (!buildSolution.RunAction())
         {

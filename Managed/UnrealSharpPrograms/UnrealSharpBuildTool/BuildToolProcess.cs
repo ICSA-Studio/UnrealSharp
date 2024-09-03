@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Collections.Generic;
 
 namespace UnrealSharpBuildTool;
 
@@ -6,16 +7,18 @@ public class BuildToolProcess : Process
 {
     public BuildToolProcess(string? fileName = null)
     {
-        if (fileName == null)
-        {
-            fileName = Program.buildToolOptions.DotNetExecutable ?? "dotnet";
-        }
+        FileInfo info = new(fileName ?? "");
         
-        StartInfo.FileName = fileName;
-        StartInfo.RedirectStandardOutput = true;
-        StartInfo.RedirectStandardError = true;
-        StartInfo.UseShellExecute = false;
-        StartInfo.CreateNoWindow = true;
+        fileName ??= Program.buildToolOptions.DotNetExecutable ?? "dotnet";
+        StartInfo = new ProcessStartInfo
+        {
+            FileName = fileName,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            Arguments = string.Join(' ', Program.GetCSProjectFile(), "build", "--configuration", Program.GetBuildConfiguration(Program.buildToolOptions.BuildConfig))
+        };
     }
 
     public bool StartBuildToolProcess()

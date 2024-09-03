@@ -26,7 +26,7 @@ public class StructMetaData : BaseMetaData
                 continue;
             }
             
-            PropertyMetaData property = new PropertyMetaData(field);
+            PropertyMetaData property = new(field);
             Fields.Add(property);
 
             if (property.IsInstancedReference)
@@ -62,7 +62,7 @@ public class StructMetaData : BaseMetaData
 
         if (IsBlittableStruct)
         {
-            CustomAttribute structFlagsAttribute = new CustomAttribute(WeaverHelper.BlittableTypeConstructor);
+            CustomAttribute structFlagsAttribute = new(WeaverHelper.BlittableTypeConstructor);
             structDefinition.CustomAttributes.Add(structFlagsAttribute);
         }
     }

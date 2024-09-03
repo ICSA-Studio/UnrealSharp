@@ -22,10 +22,10 @@ public class PublishProject : BuildToolAction
 
         BuildSolution.StartBuildingSolution(bindingsPath, Program.buildToolOptions.BuildConfig, extraArguments);
         
-        BuildSolution buildSolution = new BuildSolution();
+        BuildSolution buildSolution = new();
         buildSolution.RunAction();
         
-        WeaveProject weaveProject = new WeaveProject();
+        WeaveProject weaveProject = new();
         weaveProject.RunAction();
         
         return true;

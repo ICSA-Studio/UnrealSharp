@@ -61,7 +61,7 @@ public class ClassMetaData : TypeReferenceMetadata
                 continue;
             }
             
-            PropertyMetaData propertyMetaData = new PropertyMetaData(property);
+            PropertyMetaData propertyMetaData = new(property);
             Properties.Add(propertyMetaData);
                 
             if (propertyMetaData.IsInstancedReference)
@@ -101,7 +101,7 @@ public class ClassMetaData : TypeReferenceMetadata
                     throw new Exception($"{method.FullName} is a Blueprint override and cannot be marked as a UFunction again.");
                 }
                 
-                FunctionMetaData functionMetaData = new FunctionMetaData(method);
+                FunctionMetaData functionMetaData = new(method);
                 
                 if (isInterfaceFunction && functionMetaData.FunctionFlags.HasFlag(FunctionFlags.BlueprintNativeEvent))
                 {

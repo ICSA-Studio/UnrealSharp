@@ -1,0 +1,9 @@
+<Project>
+  <!-- See https://aka.ms/dotnet/msbuild/customize for more details on customizing your build -->
+
+  <PropertyGroup>
+	  <UEPath>$(registry:HKEY_CURRENT_USER\Software\Epic*\Unreal*\)</UEPath>
+	  <UEPath>$([MSBuild]::GetRegistryValueFromView('HKEY_CURRENT_USER\Software\Epic*\Unreal*\')</UEPath>
+	
+  </PropertyGroup>
+</Project>

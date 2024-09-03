@@ -1,9 +1,12 @@
-﻿using System.Xml;
+﻿using System.Runtime.InteropServices;
+using System.Xml;
 using Newtonsoft.Json;
 
-namespace UnrealSharpBuildTool.Actions;
+using UnrealSharpBuildTool.Models;
 
-public class GenerateProject : BuildToolAction
+namespace UnrealSharpBuildTool.Commands;
+
+public class GenerateProject(ToolOptions options) : Command(options)
 {
     public override bool RunAction()
     {
@@ -21,7 +24,7 @@ public class GenerateProject : BuildToolAction
         {
             string version = Program.GetVersion();
             BuildToolProcess generateProjectProcess = new();
-        
+            Path.Join
             // Create a class library.
             generateProjectProcess.StartInfo.ArgumentList.Add("new");
             generateProjectProcess.StartInfo.ArgumentList.Add("classlib");
@@ -251,31 +254,53 @@ public class GenerateProject : BuildToolAction
             return;
         }
         
-        CreateLaunchSettings(launchSettingsPath);
+        CreateOrUpdateLaunchSettings(launchSettingsPath);
     }
     
-    void CreateLaunchSettings(string launchSettingsPath)
+    void CreateOrUpdateLaunchSettings(string launchSettingsPath)
     {
-        Root root = new();
+        LaunchProfiles root = new();
 
-        string executablePath = string.Empty;
+        string executable = OperatingSystem.IsWindows() ? "UnrealEditor.exe" : "UnrealEditor";
+
+        string os = "Unknown";
         if (OperatingSystem.IsWindows())
         {
-            executablePath = Path.Combine(Program.buildToolOptions.EngineDirectory, "Binaries", "Win64", "UnrealEditor.exe");
+            os = "Win64";
         }
         else if (OperatingSystem.IsMacOS())
         {
-            executablePath = Path.Combine(Program.buildToolOptions.EngineDirectory, "Binaries", "Mac", "UnrealEditor");
+            os = "Mac";
         }
-        string commandLineArgs = Program.GetUProjectFilePath();
-
+        else if (OperatingSystem.IsLinux())
+        {
+            os = "Linux";
+        }
+        else if (OperatingSystem.IsTvOS())
+        {
+            os = "TVOS";
+        }
+        else if (OperatingSystem.IsIOS())
+        {
+            os = "IOS";
+        }
+        else if (OperatingSystem.IsAndroid())
+        {
+            os = "Android";
+        }
+        
+        string commandLineArgs = Options.GetUProjectFilePath().FullName;
+        var executablePath = new FileInfo(Path.Combine(Options.GetScriptFolderBinaries().ReturnIfExists().FullName, os, executable));
         // Create a new profile if it doesn't exist
-        root.Profiles ??= new Profiles();
+        if (root.Profiles == null)
+        {
+            root.Profiles = new Profiles();
+        }
             
         root.Profiles.ProfileName = new Profile
         {
             CommandName = "Executable",
-            ExecutablePath = executablePath,
+            ExecutablePath = ,
             CommandLineArgs = $"\"{commandLineArgs}\"",
         };
         
@@ -284,21 +309,45 @@ public class GenerateProject : BuildToolAction
         writer.Write(newJsonString);
         writer.Close();
     }
+
+    public override void BeforeExecute()
+    {
+        var scripts = Options.GetScriptFolder();
+        scripts.CreateIfNotExists();
+        base.BeforeExecute();
+    }
+
+    
+
+    public string[] BuildArguments()
+    {
+        var scripts = Options.GetScriptFolder();
+        return [
+            "new",
+            "classlib",
+            "-n",
+            Options.GetManagedProjectName(),
+            "-o",
+            scripts.FullName,
+            "-f",
+            Options.GetVersion()
+
+        ];
+    }
 }
 
-#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
-public class Root
+public record LaunchProfiles
 {
     [JsonProperty("profiles")]
     public Profiles Profiles { get; set; }
 }
-public class Profiles
+public record Profiles
 {
     [JsonProperty("UnrealSharp")]
     public Profile ProfileName { get; set; }
 }
 
-public class Profile
+public record Profile
 {
     [JsonProperty("commandName")]
     public string CommandName { get; set; }
@@ -309,4 +358,3 @@ public class Profile
     [JsonProperty("commandLineArgs")]
     public string CommandLineArgs { get; set; }
 }
-#pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.

@@ -29,7 +29,7 @@ public static class Program
 
     private static bool LoadBindingsAssembly()
     {
-        DefaultAssemblyResolver resolver = new DefaultAssemblyResolver();
+        DefaultAssemblyResolver resolver = new();
         
         foreach (var assemblyPath in WeaverOptions.AssemblyPaths)
         {
@@ -56,7 +56,7 @@ public static class Program
     private static bool StartProcessingUserAssembly()
     {
         string outputDirectory = StripQuotes(WeaverOptions.OutputDirectory);
-        DirectoryInfo outputDirInfo = new DirectoryInfo(outputDirectory);
+        DirectoryInfo outputDirInfo = new(outputDirectory);
         
         if (!outputDirInfo.Exists)
         {
@@ -74,7 +74,7 @@ public static class Program
 
             string weaverOutputPath = Path.Combine(outputDirectory, Path.GetFileName(userAssemblyPath));
 
-            DefaultAssemblyResolver resolver = new DefaultAssemblyResolver();
+            DefaultAssemblyResolver resolver = new();
 
             foreach (var assemblyPath in WeaverOptions.AssemblyPaths)
             {

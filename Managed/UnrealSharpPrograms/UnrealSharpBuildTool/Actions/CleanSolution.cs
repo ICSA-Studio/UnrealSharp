@@ -4,7 +4,7 @@ public class CleanSolution : BuildToolAction
 {
     public override bool RunAction()
     {
-        BuildToolProcess cleanProcess = new BuildToolProcess();
+        BuildToolProcess cleanProcess = new();
 
         string unrealSharpBinaries = Program.GetOutputPath();
 

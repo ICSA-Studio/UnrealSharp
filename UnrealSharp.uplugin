@@ -35,13 +35,11 @@
 			"LoadingPhase": "PreDefault"
 		}
 	],
-	"SupportedTargetPlatforms": 
-	[
+	"SupportedTargetPlatforms": [
 		"Win64",
 		"Mac"
 	],
-	"Plugins": 
-	[
+	"Plugins": [
 		{
 			"Name": "StructUtils",
 			"Enabled": true

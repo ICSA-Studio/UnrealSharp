@@ -26,7 +26,7 @@ public static class UnrealDelegateProcessor
                 continue;
             }
             
-            FunctionMetaData functionMetaData = new FunctionMetaData(invokerMethod.Resolve());
+            FunctionMetaData functionMetaData = new(invokerMethod.Resolve());
             
             WriteInvokerMethod(invokerMethod, functionMetaData);
             ProcessInitialize(type, functionMetaData);
@@ -83,7 +83,7 @@ public static class UnrealDelegateProcessor
                 continue;
             }
             
-            FunctionMetaData functionMetaData = new FunctionMetaData(invokerMethod.Resolve());
+            FunctionMetaData functionMetaData = new(invokerMethod.Resolve());
             
             WriteInvokerMethod(invokerMethod, functionMetaData);
             ProcessInitialize(type, functionMetaData);

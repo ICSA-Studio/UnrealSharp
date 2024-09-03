@@ -31,7 +31,7 @@ public class WeaverOptions
 
     public static WeaverOptions ParseArguments(IEnumerable<string> args)
     {
-        Parser parser = new Parser(with => with.HelpWriter = null);
+        Parser parser = new(with => with.HelpWriter = null);
         ParserResult<WeaverOptions> result = parser.ParseArguments<WeaverOptions>(args);
 
         if (result.Tag != ParserResultType.NotParsed)

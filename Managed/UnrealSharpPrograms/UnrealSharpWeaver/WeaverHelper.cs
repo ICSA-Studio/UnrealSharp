@@ -244,7 +244,7 @@ public static class WeaverHelper
     /// <returns>new instance of as copy of the original</returns>
     public static MethodDefinition CopyMethod(string name, MethodDefinition method, bool addMethod = true, bool copyMetadataToken = true)
     {
-        MethodDefinition newMethod = new MethodDefinition(name, method.Attributes, method.ReturnType)
+        MethodDefinition newMethod = new(name, method.Attributes, method.ReturnType)
         {
             HasThis = true,
             ExplicitThis = method.ExplicitThis,
@@ -394,14 +394,14 @@ public static class WeaverHelper
             parentClass = assembly.MainModule.TypeSystem.Object;
         }
         
-        TypeDefinition newType = new TypeDefinition(classNamespace, className, attributes, parentClass);
+        TypeDefinition newType = new(classNamespace, className, attributes, parentClass);
         assembly.MainModule.Types.Add(newType);
         return newType;
     }
     
     public static void AddGeneratedTypeAttribute(TypeDefinition type)
     {
-        CustomAttribute attribute = new CustomAttribute(GeneratedTypeCtor);
+        CustomAttribute attribute = new(GeneratedTypeCtor);
         string typeName = type.Name.Substring(1);
         string fullTypeName = type.Namespace + "." + typeName;
         attribute.ConstructorArguments.Add(new CustomAttributeArgument(UserAssembly.MainModule.TypeSystem.String, typeName));

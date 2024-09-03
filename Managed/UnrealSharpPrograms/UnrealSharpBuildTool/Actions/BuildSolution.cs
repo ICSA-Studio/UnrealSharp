@@ -1,8 +1,9 @@
 ﻿using System.Collections.ObjectModel;
+using CommandLine;
 
 namespace UnrealSharpBuildTool.Actions;
 
-public class BuildSolution() : BuildToolAction
+public class BuildSolution : BuildToolAction
 {
     public override bool RunAction()
     {
@@ -18,7 +19,7 @@ public class BuildSolution() : BuildToolAction
             throw new Exception($"Couldn't find the solution file at \"{slnPath}\"");
         }
         
-        BuildToolProcess buildSolutionProcess = new BuildToolProcess();
+        BuildToolProcess buildSolutionProcess = new();
         
         if (buildConfig == BuildConfig.Publish)
         {

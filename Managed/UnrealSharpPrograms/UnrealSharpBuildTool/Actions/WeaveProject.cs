@@ -15,7 +15,7 @@ public class WeaveProject : BuildToolAction
         var outputPath = Program.GetOutputPath();
         var projectName = Program.GetProjectNameAsManaged();
 
-        BuildToolProcess weaveProcess = new BuildToolProcess();
+        BuildToolProcess weaveProcess = new();
         
         // Add path to the compiled binaries.
         weaveProcess.StartInfo.ArgumentList.Add(weaverPath);
