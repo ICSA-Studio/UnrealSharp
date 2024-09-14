@@ -1,25 +1,45 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Simplification;
+using Microsoft.CodeAnalysis.FlowAnalysis;
+using Microsoft.CodeAnalysis.Formatting;
+using Microsoft.CodeAnalysis.FindSymbols;
+using Microsoft.CodeAnalysis.Operations;
+using Microsoft.CodeAnalysis.Classification;
+using Microsoft.CodeAnalysis.Tags;
+
 using Microsoft.CodeAnalysis.Text;
+
+using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using Microsoft.CodeAnalysis.Editing;
 
 namespace UnrealSharp.SourceGenerators;
 
-internal readonly struct AsyncMethodInfo(ClassDeclarationSyntax parentClass, MethodDeclarationSyntax method, string @namespace, TypeSyntax returnType, IReadOnlyDictionary<string, string> metadata)
+internal readonly record struct AsyncMethodInfo(ClassDeclarationSyntax ParentClass, MethodDeclarationSyntax Method, string Namespace, TypeSyntax ReturnType, IReadOnlyDictionary<string, string> Metadata)
 {
-    public readonly ClassDeclarationSyntax ParentClass = parentClass;
-    public readonly MethodDeclarationSyntax Method = method;
-    public readonly string Namespace = @namespace;
-    public readonly TypeSyntax ReturnType = returnType;
-    public readonly IReadOnlyDictionary<string, string> Metadata = metadata;
+    public readonly ClassDeclarationSyntax ParentClass = ParentClass;
+    public readonly MethodDeclarationSyntax Method = Method;
+    public readonly string Namespace = Namespace;
+    public readonly TypeSyntax ReturnType = ReturnType;
+    public readonly IReadOnlyDictionary<string, string> Metadata = Metadata;
+
+
 }
 
-[Generator]
+[Generator()]
 public class AsyncWrapperGenerator : ISourceGenerator
 {
+    private static SyntaxList<UsingDirectiveSyntax> UESharpUsings => List(new[]
+    {
+        UsingDirective(IdentifierName("UnrealSharp")),
+        UsingDirective(IdentifierName("UnrealSharp.Attributes")),
+        UsingDirective(IdentifierName("UnrealSharp.CSharpForUE"))
+    });
     public void Initialize(GeneratorInitializationContext context)
     {
         // Register a syntax receiver that will be created for each compilation
@@ -28,15 +48,66 @@ public class AsyncWrapperGenerator : ISourceGenerator
 
     public void Execute(GeneratorExecutionContext context)
     {
-        if (context.SyntaxReceiver is not AsyncSyntaxReceiver receiver)
+        var token = context.CancellationToken;
+        token.ThrowIfCancellationRequested();
+        var CancellationTokenType = context.Compilation.GetTypeByMetadataName("System.Threading.CancellationToken") ?? throw new InvalidOperationException("Cannot find CancellationToken type");
+        
+        if (context.SyntaxReceiver is AsyncSyntaxReceiver receiver && receiver.AsyncMethods.Count > 0)
         {
-            return;
+            var compilation = context.Compilation;
+            foreach (var info in receiver.AsyncMethods)
+            {
+                var model = compilation.GetSemanticModel(info.Method.SyntaxTree);
+                
+                var unit = CompilationUnit().WithUsings(UESharpUsings);
+                // HashSet<string> namespaces = ["UnrealSharp", "UnrealSharp.Attributes", "UnrealSharp.CSharpForUE"];
+                ParameterSyntax cancellationTokenParameter;
+                foreach (ParameterSyntax parameter in info.Method.ParameterList.Parameters)
+                {
+                    if (parameter.Type is TypeSyntax typeSyntax)
+                    {
+                        var typeInfo = model.GetTypeInfo(parameter.Type, token);
+                        var typeSymbol = typeInfo.Type;
+                        if (SymbolEqualityComparer.Default.Equals(typeSymbol, CancellationTokenType))
+                        {
+                            cancellationTokenParameter = parameter;
+                        }
+                        if (typeSymbol == null || typeSymbol.ContainingNamespace == null)
+                        {
+                            continue;
+                        }
+                        namespaces.Add(typeSymbol.ContainingNamespace.ToDisplayString());
+                    }
+                }
+                foreach (var ns in namespaces)
+                {
+                    sourceBuilder.AppendLine($"using {ns};");
+                }
+                sourceBuilder.AppendLine();
+                sourceBuilder.AppendLine($"namespace {info.Namespace}");
+                sourceBuilder.AppendLine("{");
+                var isStatic = info.Method.Modifiers.Any(static x => x.IsKind(SyntaxKind.StaticKeyword));
+                var returnTypeName = info.ReturnType != null ? model.GetTypeInfo(info.ReturnType).Type.Name : null;
+                var actionClassName = $"{info.ParentClass.Identifier.Text}{info.Method.Identifier.Text}Action";
+                var actionBaseClassName = cancellationTokenParameter != null ? "UCSCancellableAsyncAction" : "UCSBlueprintAsyncActionBase";
+                var delegateName = $"{actionClassName}Delegate";
+                var taskTypeName = info.ReturnType != null ? $"Task<{returnTypeName}>" : "Task";
+                var paramNameList = string.Join(", ", info.Method.ParameterList.Parameters.Select(p => p == cancellationTokenParameter ? "cancellationToken" : p.Identifier.Text));
+                var paramDeclListNoCancellationToken = string.Join(", ", info.Method.ParameterList.Parameters.Where(p => p != cancellationTokenParameter));
+                var metadataAttributeList = string.Join(", ", info.Metadata.Select(static pair => $"UMetaData({pair.Key}, {pair.Value})"));
+                if (string.IsNullOrEmpty(metadataAttributeList))
+                {
+                    metadataAttributeList = "UMetaData(\"BlueprintInternalUseOnly\", \"true\")";
+                }
+                else
+                {
+                    metadataAttributeList = $"UMetaData(\"BlueprintInternalUseOnly\", \"true\"), {metadataAttributeList}";
+                }
+                if (!isStatic)
+                {
+                    metadataAttributeList = $"UM
+
         }
-
-        var compilation = context.Compilation;
-
-        var cancellationTokenType = compilation.GetTypeByMetadataName("System.Threading.CancellationToken");
-
         foreach (var asyncMethodInfo in receiver.AsyncMethods)
         {
             var model = compilation.GetSemanticModel(asyncMethodInfo.Method.SyntaxTree);
@@ -44,10 +115,15 @@ public class AsyncWrapperGenerator : ISourceGenerator
 
             HashSet<string> namespaces = ["UnrealSharp", "UnrealSharp.Attributes", "UnrealSharp.CSharpForUE"];
 
-            ParameterSyntax cancellationTokenParameter = null;
-            foreach (var parameter in asyncMethodInfo.Method.ParameterList.Parameters)
+            ParameterSyntax cancellationTokenParameter;
+            
+            foreach (ParameterSyntax parameter in asyncMethodInfo.Method.ParameterList.Parameters)
             {
-                var typeInfo = model.GetTypeInfo(parameter.Type);
+                if (parameter.Type is TypeSyntax typeSyntax)
+                {
+                    
+                }
+                var typeInfo = model.GetTypeInfo(parameter.Type, token);
                 var typeSymbol = typeInfo.Type;
 
                 if (SymbolEqualityComparer.Default.Equals(typeSymbol, cancellationTokenType))
@@ -70,7 +146,7 @@ public class AsyncWrapperGenerator : ISourceGenerator
 
             sourceBuilder.AppendLine();
             sourceBuilder.AppendLine($"namespace {asyncMethodInfo.Namespace};");
-
+            model.GetTypeInfo(asyncMethodInfo.Method, token).Type.ContainingNamespace.Name
             var isStatic = asyncMethodInfo.Method.Modifiers.Any(static x => x.IsKind(SyntaxKind.StaticKeyword));
 
             var returnTypeName = asyncMethodInfo.ReturnType != null ? model.GetTypeInfo(asyncMethodInfo.ReturnType).Type.Name : null;
@@ -267,33 +343,36 @@ public class AsyncWrapperGenerator : ISourceGenerator
     }
 }
 
-internal class AsyncSyntaxReceiver : ISyntaxReceiver
+internal class AsyncSyntaxReceiver : ISyntaxContextReceiver
 {
     public List<AsyncMethodInfo> AsyncMethods { get; } = [];
 
-    public void OnVisitSyntaxNode(SyntaxNode syntaxNode)
+    /// <inheritdoc cref="ISyntaxReceiver.OnVisitSyntaxNode(SyntaxNode)" />
+    public void OnVisitSyntaxNode(SyntaxNode node)
     {
-        if (syntaxNode is not MethodDeclarationSyntax methodDeclaration)
+        if (node is AttributeSyntax attribute)
         {
-            return;
+            if (attribute.Name.ToString() == Constants.UFunction)
+            {
+                var method = (MethodDeclarationSyntax)attribute.Parent;
+                ProcessMethod(method);
+            }
+
+        }
+        if (node is MethodDeclarationSyntax method) {
+            ProcessMethod(method);
+        } else if (node is ClassDeclarationSyntax @class) {
+            foreach (var member in @class.Members.OfType<MethodDeclarationSyntax>())
+            {
+                var hasUFunctionAttribute = member.AttributeLists.Any(a => a.Attributes.Any(Constants.UFunction.IsEquivalentTo));
+                ProcessMethod(member);
+            }
         }
 
-        if (methodDeclaration.Parent is not ClassDeclarationSyntax classDeclaration)
-        {
-            return;
-        }
-        
-        var hasUFunctionAttribute = methodDeclaration.AttributeLists
-            .SelectMany(a => a.Attributes)
-            .Any(a => a.Name.ToString() == "UFunction");
+        // var walker = node.SyntaxTree.GetCompilationUnitRoot().DescendantNodes().OfType<MethodDeclarationSyntax>();
 
-        if (!hasUFunctionAttribute)
-        {
-            return;
-        }
-
-        string namespaceName = null;
-        SyntaxNode currentNode = methodDeclaration.Parent;
+        string namespaceName = string.Empty;
+        SyntaxNode? currentNode = member.Parent;
         while (currentNode != null)
         {
             // Check if the current node is a NamespaceDeclarationSyntax
@@ -321,7 +400,7 @@ internal class AsyncSyntaxReceiver : ISyntaxReceiver
 
         var metadataAttributes = methodDeclaration.AttributeLists
             .SelectMany(a => a.Attributes)
-            .Where(a => a.Name.ToString() == "UMetaData");
+            .Where(a => a.Name.ToString() == Constants.UMetaData);
 
         Dictionary<string, string> metadata = [];
         foreach (var metadataAttribute in metadataAttributes)
@@ -346,4 +425,37 @@ internal class AsyncSyntaxReceiver : ISyntaxReceiver
             return;
         }
     }
+
+    /// <inheritdoc cref="ISyntaxContextReceiver.OnVisitSyntaxNode(GeneratorSyntaxContext)" />
+    public void OnVisitSyntaxNode(GeneratorSyntaxContext context)
+    {
+        // SyntaxTreeOptionsProvider optionsProvider =
+        // context.SemanticModel.Compilation.GetCompilationNamespace(context.Node.)
+        throw new System.NotImplementedException();
+    }
+
+    private void ProcessMethod(MethodDeclarationSyntax method)
+    {
+        if (method.Modifiers.Contains(Token(SyntaxKind.AsyncKeyword)))
+        {
+            
+        }
+    }
+}
+
+
+
+}
+public static class MethodSyntaxExtensions
+{
+    public static bool IsAsyncMethod(this MethodDeclarationSyntax method)
+    {
+        return method.Modifiers.Any(SyntaxKind.AsyncKeyword);
+    }
+    public static TypeSyntax GetReturnType(this MethodDeclarationSyntax method)
+    {
+        var modifiers = method.ReturnType;
+        return method.ReturnType;
+    }
+
 }
